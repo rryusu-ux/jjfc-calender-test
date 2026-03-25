@@ -150,7 +150,34 @@
         '운영지원팀': { bg: '#F4C0D1', text: '#4B1528' },
         '아이돌봄팀': { bg: '#9FE1CB', text: '#04342C' },
         '공동육아나눔터': { bg: '#CECBF6', text: '#26215C' }
+        '기타': { bg: '#E5E8E8', text: '#424949' }
     };
+    const extraPalette = [
+        { bg: '#F9E79F', text: '#7D6608' },
+        { bg: '#D7BDE2', text: '#4A235A' },
+        { bg: '#A9DFBF', text: '#145A32' },
+        { bg: '#AED6F1', text: '#1B4F72' },
+        { bg: '#F5B7B1', text: '#78281F' }
+    ];
+    function initFilters() {
+        const teams = [...new Set(rawExcelData.map(p => p['팀명'] || '기타'))];
+        const filterContainer = document.getElementById('teamFilters');
+        filterContainer.innerHTML = `<button class="team-chip" onclick="toggleFilter('all')" id="filter-all" data-team="all">전체</button>`;
+        
+        teams.forEach((team, idx) => {
+            if(!teamSettings[team]) {
+                const colorObj = extraPalette[idx % extraPalette.length];
+                teamSettings[team] = colorObj;
+            }
+            const btn = document.createElement('button');
+            btn.className = 'team-chip';
+            btn.innerText = team;
+            btn.setAttribute('data-team', team);
+            btn.onclick = () => toggleFilter(team);
+            filterContainer.appendChild(btn);
+        });
+        updateFilterUI();
+    }
     let activeFilters = new Set(['all']);
     const extraPalette = ['#E2E2E2', '#FFDDC1', '#D1FFC1', '#C1D5FF', '#F9C1FF'];
 

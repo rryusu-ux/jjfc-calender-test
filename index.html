@@ -28,8 +28,15 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
 
-        /* 인쇄 전용 제목 (평소엔 숨김) */
-        #printTitle { display: none; text-align: center; margin-bottom: 20px; font-size: 24px; font-weight: bold; }
+        /* 1. 인쇄 제목 스타일 (25pt, Bold) */
+        #printTitle { 
+            display: none; 
+            text-align: center; 
+            margin-bottom: 15px; 
+            font-size: 25pt; 
+            font-weight: bold; 
+            color: #000;
+        }
 
         /* UI Controls */
         .no-print { margin-bottom: 20px; }
@@ -52,14 +59,15 @@
         .team-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; border: none; cursor: pointer; transition: transform 0.1s; }
         .team-chip.inactive { opacity: 0.3; filter: grayscale(0.5); }
 
-        /* Calendar */
+        /* Calendar 기본 스타일 */
         .calendar-container { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-color); }
         .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; }
         .calendar-container th { padding: 10px; background: var(--card-bg); font-weight: bold; }
         .calendar-container th:nth-child(1) { color: var(--sunday-color); }
         .calendar-container th:nth-child(7) { color: var(--saturday-color); }
 
-        .day-cell { height: 110px; position: relative; padding: 5px; overflow: hidden; }
+        /* 화면용 셀 높이 고정 */
+        .day-cell { min-height: 110px; position: relative; padding: 5px; overflow: hidden; }
         .day-num { font-weight: bold; margin-bottom: 5px; display: block; }
         .sun { color: var(--sunday-color); }
         .sat { color: var(--saturday-color); }
@@ -75,27 +83,44 @@
             z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; min-width: 150px; border-radius: 4px;
         }
 
-        /* 🖨️ 인쇄 미디어 쿼리 수정 */
+        /* 🖨️ 인쇄 최적화 (A4, A3 대응) */
         @media print {
-            .no-print { display: none !important; }
-            #printTitle { display: block !important; } /* 인쇄 시 제목 표시 */
-            body { padding: 0; background: white !important; color: black !important; }
-            .calendar-container { border: 2px solid #000; width: 100%; }
-            .day-cell { 
-                height: 130px !important; 
-                overflow: visible !important; /* 내용이 다 보이도록 설정 */
-                border: 1px solid #000;
+            @page { 
+                margin: 10mm; /* 용지 여백 최적화 */
             }
+            .no-print { display: none !important; }
+            #printTitle { display: block !important; }
+            body { padding: 0; background: white !important; color: black !important; }
+            
+            .calendar-container { 
+                border: 2px solid #000; 
+                width: 100%; 
+                table-layout: auto; /* 내용에 따라 열 너비 유동적 조절 */
+            }
+            .calendar-container th { border: 1px solid #000; background: #f0f0f0 !important; color: #000 !important; font-size: 10pt; }
+            
+            .day-cell { 
+                min-height: 120px !important; /* 최소 높이 보장 */
+                height: auto !important;     /* 내용이 많으면 자동으로 늘어남 */
+                overflow: visible !important; 
+                border: none;
+                padding: 4px;
+            }
+            
             .program-item { 
-                white-space: normal !important; /* 줄바꿈 허용 */
-                word-break: break-all;
-                border: 1px solid #eee;
+                font-size: 9pt !important;    /* 인쇄 시 가독성 있는 폰트 크기 */
+                white-space: normal !important; /* 줄바꿈 필수 */
+                word-break: keep-all;         /* 단어 단위 줄바꿈으로 깔끔하게 */
+                border: 1px solid #ccc !important;
+                margin-bottom: 3px;
+                padding: 3px 5px !important;
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact; 
-                margin-bottom: 4px;
+                line-height: 1.2;
+                display: block !important;
             }
-            .more-count { display: none !important; } /* "+N개" 숨김 (전체 출력을 위해) */
-            .day-num { font-size: 14px; }
+            .more-count { display: none !important; } 
+            .day-num { font-size: 11pt; border-bottom: 1px solid #eee; margin-bottom: 5px; width: 100%; }
         }
     </style>
 </head>
@@ -169,7 +194,6 @@
     let activeFilters = new Set(['all']);
     const extraPalette = ['#E2E2E2', '#FFDDC1', '#D1FFC1', '#C1D5FF', '#F9C1FF'];
 
-    // Excel Upload
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
@@ -250,7 +274,6 @@
         const month = document.getElementById('monthInput').value;
         const placeF = document.getElementById('placeFilter').value;
         
-        // 1. 인쇄 제목 업데이트
         const selectedMonth = parseInt(month) + 1;
         const selectedTeams = activeFilters.has('all') ? '전체팀' : Array.from(activeFilters).join(', ');
         const selectedPlace = placeF === 'all' ? '전체장소' : placeF;
@@ -278,18 +301,16 @@
                     cell.innerHTML = '<div class="day-cell"></div>';
                 } else {
                     const dailyProgs = filtered.filter(p => p.day === date);
-                    // 인쇄 시에는 모든 프로그램이 보여야 하므로 slice를 하지 않음 (단, 화면에서는 CSS overflow:hidden으로 제어)
                     let progHtml = dailyProgs.map(p => `
                         <div class="program-item" 
                              style="background:${teamSettings[p.team]?.bg}; color:${teamSettings[p.team]?.text}"
                              onmouseover="showTooltip(event, '${p.name}', '${p.time}', '${p.place}', '${p.team}')"
                              onmouseout="hideTooltip()">
-                             ${p.time} ${p.name}
+                             <strong>${p.time}</strong> ${p.name}
                         </div>
                     `).join('');
                     
                     if(dailyProgs.length > 3) {
-                        // 화면용 "+N개 더" (인쇄 시 CSS에서 자동 숨김)
                         progHtml += `<div class="more-count no-print">+${dailyProgs.length - 3}개 더</div>`;
                     }
 

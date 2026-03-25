@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사회복지 프로그램 캘린더</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+            --card-bg: #f8f9fa;
+            --primary-color: #4a90e2;
+            --sunday-color: #e74c3c;
+            --saturday-color: #3498db;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1a1a1a;
+                --text-color: #f0f0f0;
+                --border-color: #444444;
+                --card-bg: #2d2d2d;
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
+
+        /* UI Controls */
+        .no-print { margin-bottom: 20px; }
+        .header-section { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+        .upload-zone { border: 2px dashed var(--border-color); padding: 20px; text-align: center; cursor: pointer; flex-grow: 1; transition: background 0.2s; }
+        .upload-zone:hover { background: var(--card-bg); }
+        
+        .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        select, input, button { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color); cursor: pointer; }
+        button:hover { opacity: 0.8; }
+        .btn-print { background: var(--primary-color); color: white; border: none; font-weight: bold; }
+        .btn-reset { background: #666; color: white; border: none; }
+
+        /* Stats & Filters */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); }
+        .stat-card small { display: block; font-size: 0.8rem; color: #888; }
+        .stat-card strong { font-size: 1.2rem; }
+
+        .filter-section { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center; }
+        .team-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; border: none; cursor: pointer; transition: transform 0.1s; }
+        .team-chip:active { transform: scale(0.95); }
+        .team-chip.inactive { opacity: 0.3; filter: grayscale(0.5); }
+
+        /* Calendar */
+        .calendar-container { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-color); }
+        .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; overflow: hidden; }
+        .calendar-container th { padding: 10px; background: var(--card-bg); font-weight: bold; }
+        .calendar-container th:nth-child(1) { color: var(--sunday-color); }
+        .calendar-container th:nth-child(7) { color: var(--saturday-color); }
+
+        .day-cell { height: 110px; position: relative; padding: 5px; }
+        .day-num { font-weight: bold; margin-bottom: 5px; display: block; }
+        .sun { color: var(--sunday-color); }
+        .sat { color: var(--saturday-color); }
+
+        .program-item { 
+            font-size: 0.75rem; padding: 2px 4px; margin-bottom: 2px; border-radius: 2px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+        }
+        .more-count { font-size: 0.7rem; color: #888; padding-left: 4px; }
+
+        /* Tooltip */
+        .tooltip { 
+            position: absolute; display: none; background: white; border: 1px solid #333; padding: 10px; 
+            z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; min-width: 150px; border-radius: 4px;
+        }
+
+        /* Print Settings */
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; }
+            .calendar-container { border: 2px solid #000; }
+            .day-cell { height: 130px; border: 1px solid #000; }
+            .program-item { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="no-print">
+    <h2>사회복지 프로그램 캘린더 관리</h2>
+    <div class="header-section">
+        <div id="dropZone" class="upload-zone">
+            엑셀 파일을 드래그하거나 클릭하여 업로드하세요 (.xlsx)
+            <input type="file" id="fileInput" accept=".xlsx" style="display:none">
+        </div>
+        <div class="controls">
+            <input type="number" id="yearInput" value="2026" style="width: 80px;">
+            <select id="monthInput">
+                <option value="0">1월</option><option value="1">2월</option>
+                <option value="2" selected>3월</option><option value="3">4월</option>
+                <option value="4">5월</option><option value="5">6월</option>
+                <option value="6">7월</option><option value="7">8월</option>
+                <option value="8">9월</option><option value="9">10월</option>
+                <option value="10">11월</option><option value="11">12월</option>
+            </select>
+            <button onclick="renderCalendar()">달력 갱신</button>
+            <button class="btn-print" onclick="window.print()">PDF/인쇄</button>
+            <button class="btn-reset" onclick="resetData()">전체 삭제</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><small>총 프로그램</small><strong id="stat-total">0</strong></div>
+        <div class="stat-card"><small>운영 일수</small><strong id="stat-days">0</strong></div>
+        <div class="stat-card"><small>참여 팀</small><strong id="stat-teams">0</strong></div>
+        <div class="stat-card"><small>사용 장소</small><strong id="stat-places">0</strong></div>
+    </div>
+
+    <div class="filter-section">
+        <span>팀 필터:</span>
+        <div id="teamFilters" style="display: inline-flex; gap: 5px;"></div>
+    </div>
+    <div class="filter-section">
+        <span>장소 필터:</span>
+        <select id="placeFilter" onchange="renderCalendar()">
+            <option value="all">전체 장소</option>
+        </select>
+    </div>
+</div>
+
+<table class="calendar-container">
+    <thead>
+        <tr>
+            <th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
+        </tr>
+    </thead>
+    <tbody id="calendarBody"></tbody>
+</table>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+    let allPrograms = [];
+    let teamSettings = {
+        '가족사례팀': { bg: '#B5D4F4', text: '#042C53' },
+        '가족교육문화팀': { bg: '#C0DD97', text: '#173404' },
+        '지역공동체팀': { bg: '#FAC775', text: '#412402' },
+        '운영지원팀': { bg: '#F4C0D1', text: '#4B1528' },
+        '아이돌봄팀': { bg: '#9FE1CB', text: '#04342C' },
+        '공동육아나눔터': { bg: '#CECBF6', text: '#26215C' }
+    };
+    let activeFilters = new Set(['all']);
+    const extraPalette = ['#E2E2E2', '#FFDDC1', '#D1FFC1', '#C1D5FF', '#F9C1FF'];
+
+    // Excel Upload
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.onclick = () => fileInput.click();
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = '#eee'; };
+    dropZone.ondragleave = () => dropZone.style.background = 'transparent';
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        handleFile(e.dataTransfer.files[0]);
+    };
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+    function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets["프로그램입력"];
+            if(!sheet) { alert("'프로그램입력' 시트를 찾을 수 없습니다."); return; }
+            
+            const json = XLSX.utils.sheet_to_json(sheet, { range: 2 }); // 3행(index 2)부터 시작
+            allPrograms = json.map(row => ({
+                day: parseInt(row['날짜(일)']),
+                name: row['프로그램명'] || '',
+                time: row['시간'] || '',
+                place: row['장소'] || '미지정',
+                team: row['팀명'] || '기타'
+            })).filter(p => !isNaN(p.day));
+
+            initFilters();
+            renderCalendar();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function initFilters() {
+        const teams = [...new Set(allPrograms.map(p => p.team))];
+        const places = [...new Set(allPrograms.map(p => p.place))];
+        
+        // 팀 필터 생성
+        const filterContainer = document.getElementById('teamFilters');
+        filterContainer.innerHTML = `<button class="team-chip" onclick="toggleFilter('all')" id="filter-all">전체</button>`;
+        
+        teams.forEach((team, idx) => {
+            if(!teamSettings[team]) {
+                const color = extraPalette[idx % extraPalette.length];
+                teamSettings[team] = { bg: color, text: '#333' };
+            }
+            const btn = document.createElement('button');
+            btn.className = 'team-chip';
+            btn.innerText = team;
+            btn.style.backgroundColor = teamSettings[team].bg;
+            btn.style.color = teamSettings[team].text;
+            btn.onclick = () => toggleFilter(team);
+            filterContainer.appendChild(btn);
+        });
+
+        // 장소 필터 생성
+        const placeSelect = document.getElementById('placeFilter');
+        placeSelect.innerHTML = '<option value="all">전체 장소</option>';
+        places.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p; opt.innerText = p;
+            placeSelect.appendChild(opt);
+        });
+    }
+
+    function toggleFilter(team) {
+        if(team === 'all') {
+            activeFilters = new Set(['all']);
+        } else {
+            activeFilters.delete('all');
+            if(activeFilters.has(team)) activeFilters.delete(team);
+            else activeFilters.add(team);
+            if(activeFilters.size === 0) activeFilters.add('all');
+        }
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const year = document.getElementById('yearInput').value;
+        const month = document.getElementById('monthInput').value;
+        const placeF = document.getElementById('placeFilter').value;
+        
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, parseInt(month) + 1, 0).getDate();
+        
+        const tbody = document.getElementById('calendarBody');
+        tbody.innerHTML = '';
+
+        // 필터링 적용
+        const filtered = allPrograms.filter(p => {
+            const teamMatch = activeFilters.has('all') || activeFilters.has(p.team);
+            const placeMatch = placeF === 'all' || p.place === placeF;
+            return teamMatch && placeMatch;
+        });
+
+        // 통계 업데이트
+        updateStats(filtered);
+
+        let date = 1;
+        for (let i = 0; i < 6; i++) {
+            let row = document.createElement('tr');
+            for (let j = 0; j < 7; j++) {
+                let cell = document.createElement('td');
+                if (i === 0 && j < firstDay || date > lastDate) {
+                    cell.innerHTML = '<div class="day-cell"></div>';
+                } else {
+                    const dailyProgs = filtered.filter(p => p.day === date);
+                    let progHtml = dailyProgs.slice(0, 3).map(p => `
+                        <div class="program-item" 
+                             style="background:${teamSettings[p.team]?.bg}; color:${teamSettings[p.team]?.text}"
+                             onmouseover="showTooltip(event, '${p.name}', '${p.time}', '${p.place}', '${p.team}')"
+                             onmouseout="hideTooltip()">
+                             ${p.time} · ${p.name}
+                        </div>
+                    `).join('');
+                    
+                    if(dailyProgs.length > 3) {
+                        progHtml += `<div class="more-count">+${dailyProgs.length - 3}개 더</div>`;
+                    }
+
+                    const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
+                    cell.innerHTML = `
+                        <div class="day-cell">
+                            <span class="day-num ${dayClass}">${date}</span>
+                            ${progHtml}
+                        </div>
+                    `;
+                    date++;
+                }
+                row.appendChild(cell);
+            }
+            tbody.appendChild(row);
+            if (date > lastDate) break;
+        }
+        
+        // 필터 버튼 활성화 표시
+        document.querySelectorAll('.team-chip').forEach(btn => {
+            if(activeFilters.has(btn.innerText) || (btn.id === 'filter-all' && activeFilters.has('all'))) {
+                btn.classList.remove('inactive');
+            } else {
+                btn.classList.add('inactive');
+            }
+        });
+    }
+
+    function updateStats(data) {
+        document.getElementById('stat-total').innerText = data.length;
+        document.getElementById('stat-days').innerText = new Set(data.map(p => p.day)).size;
+        document.getElementById('stat-teams').innerText = new Set(data.map(p => p.team)).size;
+        document.getElementById('stat-places').innerText = new Set(data.map(p => p.place)).size;
+    }
+
+    function showTooltip(e, name, time, place, team) {
+        const tt = document.getElementById('tooltip');
+        tt.innerHTML = `<strong>${name}</strong><br>🕒 ${time}<br>📍 ${place}<br>👥 ${team}`;
+        tt.style.display = 'block';
+        tt.style.left = (e.pageX + 10) + 'px';
+        tt.style.top = (e.pageY + 10) + 'px';
+    }
+
+    function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+    function resetData() {
+        if(confirm("모든 데이터를 삭제하시겠습니까?")) {
+            allPrograms = [];
+            renderCalendar();
+            initFilters();
+        }
+    }
+
+    window.onload = renderCalendar;
+</script>
+</body>
+</html>

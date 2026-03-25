@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>사회복지 프로그램 캘린더 (드래그 복구)</title>
+    <title>사회복지 프로그램 캘린더 (필터 강조)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -14,6 +14,8 @@
             --primary-color: #4a90e2;
             --sunday-color: #e74c3c;
             --saturday-color: #3498db;
+            --inactive-bg: #eeeeee; /* 선택 안된 버튼 배경 */
+            --inactive-text: #aaaaaa; /* 선택 안된 버튼 글자 */
         }
 
         @media (prefers-color-scheme: dark) {
@@ -22,20 +24,15 @@
                 --text-color: #f0f0f0;
                 --border-color: #444444;
                 --card-bg: #2d2d2d;
+                --inactive-bg: #333333;
+                --inactive-text: #666666;
             }
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
 
-        #printTitle { 
-            display: none; 
-            text-align: center; 
-            margin-bottom: 20px; 
-            font-size: 25pt; 
-            font-weight: bold; 
-            color: #000;
-        }
+        #printTitle { display: none; text-align: center; margin-bottom: 20px; font-size: 25pt; font-weight: bold; color: #000; }
 
         .no-print { margin-bottom: 20px; }
         .header-section { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -44,35 +41,41 @@
         
         .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
         select, input, button { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color); cursor: pointer; }
-        button:hover { opacity: 0.8; }
+        
         .btn-print { background: var(--primary-color); color: white; border: none; font-weight: bold; }
         .btn-reset { background: #666; color: white; border: none; }
 
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .stat-card { background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); }
         .stat-card small { display: block; font-size: 0.8rem; color: #888; }
-        .stat-card strong { font-size: 1.2rem; }
 
         .filter-section { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center; }
-        .team-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; border: none; cursor: pointer; transition: transform 0.1s; }
-        .team-chip.inactive { opacity: 0.3; filter: grayscale(0.5); }
+        
+        /* 🎨 팀 필터 버튼 스타일 수정 */
+        .team-chip { 
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            font-size: 0.85rem; 
+            border: 1px solid transparent; 
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            font-weight: 600;
+        }
+        /* 비활성화(선택 안됨) 상태 */
+        .team-chip.inactive { 
+            background-color: var(--inactive-bg) !important; 
+            color: var(--inactive-text) !important;
+            border-color: var(--border-color);
+            opacity: 0.6;
+        }
 
-        .calendar-container { 
-            width: 100%; 
-            border-collapse: collapse; 
-            table-layout: fixed; 
-            border: 1px solid var(--border-color); 
-        }
-        .calendar-container th, .calendar-container td { 
-            border: 1px solid var(--border-color); 
-            vertical-align: top;
-            width: 14.285%; 
-        }
+        .calendar-container { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-color); }
+        .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; width: 14.285%; }
         .calendar-container th { padding: 10px; background: var(--card-bg); font-weight: bold; }
         .calendar-container th:nth-child(1) { color: var(--sunday-color); }
         .calendar-container th:nth-child(7) { color: var(--saturday-color); }
 
-        .day-cell { min-height: 110px; position: relative; padding: 5px; overflow: hidden; }
+        .day-cell { min-height: 110px; position: relative; padding: 5px; }
         .day-num { font-weight: bold; margin-bottom: 5px; display: block; }
         .sun { color: var(--sunday-color); }
         .sat { color: var(--saturday-color); }
@@ -81,31 +84,14 @@
             font-size: 0.75rem; padding: 2px 4px; margin-bottom: 2px; border-radius: 2px; 
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
         }
-        .more-count { font-size: 0.7rem; color: #888; padding-left: 4px; }
 
-        .tooltip { 
-            position: absolute; display: none; background: white; border: 1px solid #333; padding: 10px; 
-            z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; min-width: 150px; border-radius: 4px;
-        }
+        .tooltip { position: absolute; display: none; background: white; border: 1px solid #333; padding: 10px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; border-radius: 4px; }
 
         @media print {
-            @page { margin: 10mm; size: auto; }
             .no-print { display: none !important; }
             #printTitle { display: block !important; }
-            body { padding: 0; background: white !important; color: black !important; }
-            .calendar-container { border: 2px solid #000 !important; width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; }
-            .calendar-container th, .calendar-container td { 
-                width: 14.285% !important; min-width: 14.285% !important; max-width: 14.285% !important;
-                border: 1px solid #000 !important; overflow: visible !important;
-            }
-            .day-cell { min-height: 120px !important; height: auto !important; }
-            .program-item { 
-                font-size: 9pt !important; white-space: normal !important; word-break: break-all !important; 
-                border: 1px solid #ccc !important; margin-bottom: 3px; padding: 3px 5px !important; display: block !important;
-                -webkit-print-color-adjust: exact; print-color-adjust: exact; 
-            }
-            .more-count { display: none !important; } 
-            .day-num { font-size: 11pt; border-bottom: 1px solid #eee; margin-bottom: 5px; width: 100%; }
+            .calendar-container th, .calendar-container td { border: 1px solid #000 !important; }
+            .program-item { white-space: normal !important; word-break: break-all !important; display: block !important; border: 1px solid #ccc !important; }
         }
     </style>
 </head>
@@ -114,7 +100,7 @@
 <h1 id="printTitle">프로그램 캘린더</h1>
 
 <div class="no-print">
-    <h2>사회복지 프로그램 관리 (요일 자동화)</h2>
+    <h2>사회복지 프로그램 관리 (필터 강조)</h2>
     <div class="header-section">
         <div id="dropZone" class="upload-zone">
             엑셀 파일을 드래그하거나 클릭하여 업로드하세요 (.xlsx)
@@ -140,27 +126,16 @@
         <div class="stat-card"><small>총 프로그램</small><strong id="stat-total">0</strong></div>
         <div class="stat-card"><small>운영 일수</small><strong id="stat-days">0</strong></div>
         <div class="stat-card"><small>참여 팀</small><strong id="stat-teams">0</strong></div>
-        <div class="stat-card"><small>사용 장소</small><strong id="stat-places">0</strong></div>
     </div>
 
     <div class="filter-section">
         <span>팀 필터:</span>
-        <div id="teamFilters" style="display: inline-flex; gap: 5px;"></div>
-    </div>
-    <div class="filter-section">
-        <span>장소 필터:</span>
-        <select id="placeFilter" onchange="renderCalendar()">
-            <option value="all">전체 장소</option>
-        </select>
+        <div id="teamFilters" style="display: inline-flex; gap: 8px;"></div>
     </div>
 </div>
 
 <table class="calendar-container">
-    <thead>
-        <tr>
-            <th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
-        </tr>
-    </thead>
+    <thead><tr><th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr></thead>
     <tbody id="calendarBody"></tbody>
 </table>
 
@@ -179,27 +154,18 @@
     let activeFilters = new Set(['all']);
     const extraPalette = ['#E2E2E2', '#FFDDC1', '#D1FFC1', '#C1D5FF', '#F9C1FF'];
 
-    // --- 업로드 및 드래그 앤 드롭 복구 시작 ---
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
     dropZone.onclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
-
-    dropZone.ondragover = (e) => { 
-        e.preventDefault(); 
-        dropZone.style.background = '#eee'; 
-    };
-    dropZone.ondragleave = () => { 
-        dropZone.style.background = 'transparent'; 
-    };
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.background = '#eee'; };
+    dropZone.ondragleave = () => { dropZone.style.background = 'transparent'; };
     dropZone.ondrop = (e) => {
         e.preventDefault();
         dropZone.style.background = 'transparent';
-        const files = e.dataTransfer.files;
-        if (files.length > 0) handleFile(files[0]);
+        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
     };
-    // --- 업로드 및 드래그 앤 드롭 복구 끝 ---
 
     function handleFile(file) {
         if(!file) return;
@@ -209,7 +175,6 @@
             const workbook = XLSX.read(data, { type: 'array' });
             const sheet = workbook.Sheets["프로그램입력"];
             if(!sheet) { alert("'프로그램입력' 시트를 찾을 수 없습니다."); return; }
-            
             rawExcelData = XLSX.utils.sheet_to_json(sheet, { range: 2 });
             initFilters();
             renderCalendar();
@@ -222,23 +187,15 @@
     function getProcessedPrograms(year, month) {
         let processed = [];
         const lastDate = new Date(year, month + 1, 0).getDate();
-
         rawExcelData.forEach(row => {
             const dayNum = parseInt(row['날짜(일)']);
             const weekDaysStr = row['요일'] ? String(row['요일']) : "";
-
-            if (!isNaN(dayNum)) {
-                processed.push({ ...row, day: dayNum });
-            } 
+            if (!isNaN(dayNum)) { processed.push({ ...row, day: dayNum }); } 
             else if (weekDaysStr.trim() !== "") {
                 const targetDays = weekDaysStr.split(',').map(s => s.trim());
                 for (let d = 1; d <= lastDate; d++) {
                     const currentDayOfWeek = new Date(year, month, d).getDay();
-                    targetDays.forEach(target => {
-                        if (dayMap[target] === currentDayOfWeek) {
-                            processed.push({ ...row, day: d });
-                        }
-                    });
+                    targetDays.forEach(target => { if (dayMap[target] === currentDayOfWeek) processed.push({ ...row, day: d }); });
                 }
             }
         });
@@ -247,29 +204,22 @@
 
     function initFilters() {
         const teams = [...new Set(rawExcelData.map(p => p['팀명'] || '기타'))];
-        const places = [...new Set(rawExcelData.map(p => p['장소'] || '미지정'))];
         const filterContainer = document.getElementById('teamFilters');
         filterContainer.innerHTML = `<button class="team-chip" onclick="toggleFilter('all')" id="filter-all">전체</button>`;
         
         teams.forEach((team, idx) => {
-            if(!teamSettings[team]) {
-                teamSettings[team] = { bg: extraPalette[idx % extraPalette.length], text: '#333' };
-            }
+            if(!teamSettings[team]) teamSettings[team] = { bg: extraPalette[idx % extraPalette.length], text: '#333' };
             const btn = document.createElement('button');
-            btn.className = 'team-chip'; btn.innerText = team;
+            btn.className = 'team-chip';
+            btn.innerText = team;
+            btn.setAttribute('data-team', team);
+            // 초기 배경색 설정
             btn.style.backgroundColor = teamSettings[team].bg;
             btn.style.color = teamSettings[team].text;
             btn.onclick = () => toggleFilter(team);
             filterContainer.appendChild(btn);
         });
-
-        const placeSelect = document.getElementById('placeFilter');
-        placeSelect.innerHTML = '<option value="all">전체 장소</option>';
-        places.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p; opt.innerText = p;
-            placeSelect.appendChild(opt);
-        });
+        updateFilterUI();
     }
 
     function toggleFilter(team) {
@@ -280,21 +230,43 @@
             else activeFilters.add(team);
             if(activeFilters.size === 0) activeFilters.add('all');
         }
+        updateFilterUI();
         renderCalendar();
+    }
+
+    // 🎨 버튼 색상 업데이트 로직
+    function updateFilterUI() {
+        document.querySelectorAll('.team-chip').forEach(btn => {
+            const teamName = btn.getAttribute('data-team') || 'all';
+            const isAll = teamName === 'all';
+            
+            const isActive = activeFilters.has(teamName);
+            
+            if (isActive) {
+                btn.classList.remove('inactive');
+                // 활성화 시 팀별 고유 색상 복구
+                if(!isAll) {
+                    btn.style.backgroundColor = teamSettings[teamName].bg;
+                    btn.style.color = teamSettings[teamName].text;
+                } else {
+                    btn.style.backgroundColor = 'var(--primary-color)';
+                    btn.style.color = 'white';
+                }
+            } else {
+                btn.classList.add('inactive');
+                // 비활성화 시 스타일은 CSS(.inactive)에서 처리하도록 스타일 제거
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+            }
+        });
     }
 
     function renderCalendar() {
         const year = parseInt(document.getElementById('yearInput').value);
         const month = parseInt(document.getElementById('monthInput').value);
-        const placeF = document.getElementById('placeFilter').value;
         const monthlyPrograms = getProcessedPrograms(year, month);
 
-        const filtered = monthlyPrograms.filter(p => {
-            const teamMatch = activeFilters.has('all') || activeFilters.has(p['팀명']);
-            const placeMatch = placeF === 'all' || p['장소'] === placeF;
-            return teamMatch && placeMatch;
-        });
-
+        const filtered = monthlyPrograms.filter(p => activeFilters.has('all') || activeFilters.has(p['팀명']));
         updateStats(filtered);
         
         const firstDay = new Date(year, month, 1).getDay();
@@ -312,14 +284,11 @@
                 } else {
                     const dailyProgs = filtered.filter(p => p.day === date);
                     let progHtml = dailyProgs.map(p => `
-                        <div class="program-item" 
-                             style="background:${teamSettings[p['팀명']]?.bg}; color:${teamSettings[p['팀명']]?.text}"
-                             onmouseover="showTooltip(event, '${p['프로그램명']}', '${p['시간']}', '${p['장소']}', '${p['팀명']}')"
-                             onmouseout="hideTooltip()">
+                        <div class="program-item" style="background:${teamSettings[p['팀명']]?.bg}; color:${teamSettings[p['팀명']]?.text}"
+                             onmouseover="showTooltip(event, '${p['프로그램명']}', '${p['시간']}', '${p['장소']}', '${p['팀명']}')" onmouseout="hideTooltip()">
                              <strong>${p['시간']}</strong> ${p['프로그램명']}
                         </div>
                     `).join('');
-                    if(dailyProgs.length > 4) progHtml += `<div class="more-count no-print">+${dailyProgs.length - 4}개 더</div>`;
                     const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
                     cell.innerHTML = `<div class="day-cell"><span class="day-num ${dayClass}">${date}</span>${progHtml}</div>`;
                     date++;
@@ -335,15 +304,12 @@
         document.getElementById('stat-total').innerText = data.length;
         document.getElementById('stat-days').innerText = new Set(data.map(p => p.day)).size;
         document.getElementById('stat-teams').innerText = new Set(data.map(p => p['팀명'])).size;
-        document.getElementById('stat-places').innerText = new Set(data.map(p => p['장소'])).size;
     }
 
     function showTooltip(e, name, time, place, team) {
         const tt = document.getElementById('tooltip');
         tt.innerHTML = `<strong>${name}</strong><br>🕒 ${time}<br>📍 ${place}<br>👥 ${team}`;
-        tt.style.display = 'block';
-        tt.style.left = (e.pageX + 10) + 'px';
-        tt.style.top = (e.pageY + 10) + 'px';
+        tt.style.display = 'block'; tt.style.left = (e.pageX + 10) + 'px'; tt.style.top = (e.pageY + 10) + 'px';
     }
     function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
     function resetData() { if(confirm("초기화하시겠습니까?")) { rawExcelData = []; renderCalendar(); } }

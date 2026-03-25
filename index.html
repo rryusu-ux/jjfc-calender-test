@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>사회복지 프로그램 캘린더 (필터 완벽 복구)</title>
+    <title>사회복지 프로그램 캘린더 (아이돌봄팀 색상 변경)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -145,15 +145,16 @@
         '가족교육문화팀': { bg: '#C0DD97', text: '#173404' },
         '지역공동체팀': { bg: '#FAC775', text: '#412402' },
         '운영지원팀': { bg: '#F4C0D1', text: '#4B1528' },
-        '아이돌봄팀': { bg: '#9FE1CB', text: '#04342C' },
+        '아이돌봄팀': { bg: '#D7BDE2', text: '#4A235A' }, // 연보라색으로 변경
         '공동육아나눔터': { bg: '#CECBF6', text: '#26215C' },
         '기타': { bg: '#E5E8E8', text: '#424949' }
     };
     
+    // 신규 팀 자동 배정용 여분 팔레트 (기존과 안 겹치도록 보강)
     const extraPalette = [
-        { bg: '#F9E79F', text: '#7D6608' }, { bg: '#D7BDE2', text: '#4A235A' },
-        { bg: '#A9DFBF', text: '#145A32' }, { bg: '#AED6F1', text: '#1B4F72' },
-        { bg: '#F5B7B1', text: '#78281F' }
+        { bg: '#F9E79F', text: '#7D6608' }, { bg: '#A9DFBF', text: '#145A32' }, 
+        { bg: '#AED6F1', text: '#1B4F72' }, { bg: '#F5B7B1', text: '#78281F' },
+        { bg: '#9FE1CB', text: '#04342C' }
     ];
 
     let activeFilters = new Set(['all']);
@@ -194,147 +195,4 @@
         rawExcelData.forEach(row => {
             const teamName = row['팀명'] || '기타';
             const dayNum = parseInt(row['날짜(일)']);
-            const weekDaysStr = row['요일'] ? String(row['요일']) : "";
-            
-            if (!isNaN(dayNum)) { 
-                processed.push({ ...row, team: teamName, day: dayNum }); 
-            } 
-            else if (weekDaysStr.trim() !== "") {
-                const targetDays = weekDaysStr.split(',').map(s => s.trim());
-                for (let d = 1; d <= lastDate; d++) {
-                    const currentDayOfWeek = new Date(year, month, d).getDay();
-                    targetDays.forEach(target => { 
-                        if (dayMap[target] === currentDayOfWeek) processed.push({ ...row, team: teamName, day: d }); 
-                    });
-                }
-            }
-        });
-        return processed;
-    }
-
-    function initFilters() {
-        const teams = [...new Set(rawExcelData.map(p => p['팀명'] || '기타'))];
-        const places = [...new Set(rawExcelData.map(p => p['장소'] || '미지정'))];
-        
-        // 1. 팀 필터 생성
-        const filterContainer = document.getElementById('teamFilters');
-        filterContainer.innerHTML = `<button class="team-chip" onclick="toggleFilter('all')" data-team="all">전체</button>`;
-        
-        teams.forEach((team, idx) => {
-            if(!teamSettings[team]) teamSettings[team] = extraPalette[idx % extraPalette.length];
-            const btn = document.createElement('button');
-            btn.className = 'team-chip';
-            btn.innerText = team;
-            btn.setAttribute('data-team', team);
-            btn.onclick = () => toggleFilter(team);
-            filterContainer.appendChild(btn);
-        });
-
-        // 2. 장소 필터 복구
-        const placeSelect = document.getElementById('placeFilter');
-        placeSelect.innerHTML = '<option value="all">전체 장소</option>';
-        places.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p; opt.innerText = p;
-            placeSelect.appendChild(opt);
-        });
-
-        updateFilterUI();
-    }
-
-    function toggleFilter(team) {
-        if(team === 'all') activeFilters = new Set(['all']);
-        else {
-            activeFilters.delete('all');
-            if(activeFilters.has(team)) activeFilters.delete(team);
-            else activeFilters.add(team);
-            if(activeFilters.size === 0) activeFilters.add('all');
-        }
-        updateFilterUI();
-        renderCalendar();
-    }
-
-    function updateFilterUI() {
-        document.querySelectorAll('.team-chip').forEach(btn => {
-            const teamName = btn.getAttribute('data-team');
-            const isActive = activeFilters.has(teamName);
-            if (isActive) {
-                btn.classList.remove('inactive');
-                if(teamName === 'all') {
-                    btn.style.backgroundColor = 'var(--primary-color)';
-                    btn.style.color = 'white';
-                } else {
-                    btn.style.backgroundColor = teamSettings[teamName].bg;
-                    btn.style.color = teamSettings[teamName].text;
-                }
-            } else {
-                btn.classList.add('inactive');
-                btn.style.backgroundColor = ''; btn.style.color = '';
-            }
-        });
-    }
-
-    function renderCalendar() {
-        const year = parseInt(document.getElementById('yearInput').value);
-        const month = parseInt(document.getElementById('monthInput').value);
-        const placeF = document.getElementById('placeFilter').value;
-        
-        const monthlyPrograms = getProcessedPrograms(year, month);
-
-        // 팀 필터와 장소 필터 동시 적용
-        const filtered = monthlyPrograms.filter(p => {
-            const teamMatch = activeFilters.has('all') || activeFilters.has(p.team);
-            const placeMatch = placeF === 'all' || p['장소'] === placeF;
-            return teamMatch && placeMatch;
-        });
-
-        updateStats(filtered);
-        
-        const firstDay = new Date(year, month, 1).getDay();
-        const lastDate = new Date(year, month + 1, 0).getDate();
-        const tbody = document.getElementById('calendarBody');
-        tbody.innerHTML = '';
-
-        let date = 1;
-        for (let i = 0; i < 6; i++) {
-            let row = document.createElement('tr');
-            for (let j = 0; j < 7; j++) {
-                let cell = document.createElement('td');
-                if (i === 0 && j < firstDay || date > lastDate) {
-                    cell.innerHTML = '<div class="day-cell"></div>';
-                } else {
-                    const dailyProgs = filtered.filter(p => p.day === date);
-                    let progHtml = dailyProgs.map(p => `
-                        <div class="program-item" style="background:${teamSettings[p.team]?.bg}; color:${teamSettings[p.team]?.text}"
-                             onmouseover="showTooltip(event, '${p['프로그램명']}', '${p['시간']}', '${p['장소']}', '${p.team}')" onmouseout="hideTooltip()">
-                             <strong>${p['시간']}</strong> ${p['프로그램명']}
-                        </div>
-                    `).join('');
-                    const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
-                    cell.innerHTML = `<div class="day-cell"><span class="day-num ${dayClass}">${date}</span>${progHtml}</div>`;
-                    date++;
-                }
-                row.appendChild(cell);
-            }
-            tbody.appendChild(row);
-            if (date > lastDate) break;
-        }
-    }
-
-    function updateStats(data) {
-        document.getElementById('stat-total').innerText = data.length;
-        document.getElementById('stat-days').innerText = new Set(data.map(p => p.day)).size;
-        document.getElementById('stat-teams').innerText = new Set(data.map(p => p.team)).size;
-    }
-
-    function showTooltip(e, name, time, place, team) {
-        const tt = document.getElementById('tooltip');
-        tt.innerHTML = `<strong>${name}</strong><br>🕒 ${time}<br>📍 ${place}<br>👥 ${team}`;
-        tt.style.display = 'block'; tt.style.left = (e.pageX + 10) + 'px'; tt.style.top = (e.pageY + 10) + 'px';
-    }
-    function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
-    function resetData() { if(confirm("데이터를 모두 삭제하시겠습니까?")) { rawExcelData = []; renderCalendar(); document.getElementById('placeFilter').innerHTML = '<option value="all">전체 장소</option>'; } }
-    window.onload = renderCalendar;
-</script>
-</body>
-</html>
+            const weekDaysStr = row['요일'] ? String(row['

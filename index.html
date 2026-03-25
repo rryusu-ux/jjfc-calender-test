@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>사회복지 프로그램 캘린더 (요일 자동화)</title>
+    <title>사회복지 프로그램 캘린더 (드래그 복구)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -117,7 +117,7 @@
     <h2>사회복지 프로그램 관리 (요일 자동화)</h2>
     <div class="header-section">
         <div id="dropZone" class="upload-zone">
-            엑셀 파일을 업로드하세요 (.xlsx) - '요일' 컬럼 인식 가능
+            엑셀 파일을 드래그하거나 클릭하여 업로드하세요 (.xlsx)
             <input type="file" id="fileInput" accept=".xlsx" style="display:none">
         </div>
         <div class="controls">
@@ -167,7 +167,7 @@
 <div id="tooltip" class="tooltip"></div>
 
 <script>
-    let rawExcelData = []; // 엑셀에서 읽어온 원본 데이터
+    let rawExcelData = []; 
     let teamSettings = {
         '가족사례팀': { bg: '#B5D4F4', text: '#042C53' },
         '가족교육문화팀': { bg: '#C0DD97', text: '#173404' },
@@ -179,11 +179,27 @@
     let activeFilters = new Set(['all']);
     const extraPalette = ['#E2E2E2', '#FFDDC1', '#D1FFC1', '#C1D5FF', '#F9C1FF'];
 
+    // --- 업로드 및 드래그 앤 드롭 복구 시작 ---
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
     dropZone.onclick = () => fileInput.click();
-    dropZone.onchange = (e) => handleFile(e.target.files[0]);
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+    dropZone.ondragover = (e) => { 
+        e.preventDefault(); 
+        dropZone.style.background = '#eee'; 
+    };
+    dropZone.ondragleave = () => { 
+        dropZone.style.background = 'transparent'; 
+    };
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.style.background = 'transparent';
+        const files = e.dataTransfer.files;
+        if (files.length > 0) handleFile(files[0]);
+    };
+    // --- 업로드 및 드래그 앤 드롭 복구 끝 ---
 
     function handleFile(file) {
         if(!file) return;
@@ -194,7 +210,6 @@
             const sheet = workbook.Sheets["프로그램입력"];
             if(!sheet) { alert("'프로그램입력' 시트를 찾을 수 없습니다."); return; }
             
-            // 엑셀 데이터를 읽어옴 (날짜(일) 또는 요일 포함)
             rawExcelData = XLSX.utils.sheet_to_json(sheet, { range: 2 });
             initFilters();
             renderCalendar();
@@ -202,7 +217,6 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // 요일 문자열을 숫자로 변환 (일:0 ~ 토:6)
     const dayMap = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
 
     function getProcessedPrograms(year, month) {
@@ -213,11 +227,9 @@
             const dayNum = parseInt(row['날짜(일)']);
             const weekDaysStr = row['요일'] ? String(row['요일']) : "";
 
-            // 1. 특정 날짜가 지정된 경우 (우선순위)
             if (!isNaN(dayNum)) {
                 processed.push({ ...row, day: dayNum });
             } 
-            // 2. 요일이 지정된 경우 (해당 월의 모든 해당 요일에 뿌림)
             else if (weekDaysStr.trim() !== "") {
                 const targetDays = weekDaysStr.split(',').map(s => s.trim());
                 for (let d = 1; d <= lastDate; d++) {
@@ -244,8 +256,7 @@
                 teamSettings[team] = { bg: extraPalette[idx % extraPalette.length], text: '#333' };
             }
             const btn = document.createElement('button');
-            btn.className = 'team-chip';
-            btn.innerText = team;
+            btn.className = 'team-chip'; btn.innerText = team;
             btn.style.backgroundColor = teamSettings[team].bg;
             btn.style.color = teamSettings[team].text;
             btn.onclick = () => toggleFilter(team);
@@ -276,8 +287,6 @@
         const year = parseInt(document.getElementById('yearInput').value);
         const month = parseInt(document.getElementById('monthInput').value);
         const placeF = document.getElementById('placeFilter').value;
-        
-        // 요일 로직을 거친 최종 프로그램 리스트 생성
         const monthlyPrograms = getProcessedPrograms(year, month);
 
         const filtered = monthlyPrograms.filter(p => {
@@ -310,11 +319,7 @@
                              <strong>${p['시간']}</strong> ${p['프로그램명']}
                         </div>
                     `).join('');
-                    
-                    if(dailyProgs.length > 4) {
-                        progHtml += `<div class="more-count no-print">+${dailyProgs.length - 4}개 더</div>`;
-                    }
-
+                    if(dailyProgs.length > 4) progHtml += `<div class="more-count no-print">+${dailyProgs.length - 4}개 더</div>`;
                     const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
                     cell.innerHTML = `<div class="day-cell"><span class="day-num ${dayClass}">${date}</span>${progHtml}</div>`;
                     date++;

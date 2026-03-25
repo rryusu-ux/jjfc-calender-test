@@ -28,17 +28,15 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
 
-        /* 1. 인쇄 제목 스타일 (25pt, Bold) */
         #printTitle { 
             display: none; 
             text-align: center; 
-            margin-bottom: 20px; 
+            margin-bottom: 15px; 
             font-size: 25pt; 
             font-weight: bold; 
             color: #000;
         }
 
-        /* UI Controls */
         .no-print { margin-bottom: 20px; }
         .header-section { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
         .upload-zone { border: 2px dashed var(--border-color); padding: 20px; text-align: center; cursor: pointer; flex-grow: 1; transition: background 0.2s; }
@@ -59,17 +57,17 @@
         .team-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; border: none; cursor: pointer; transition: transform 0.1s; }
         .team-chip.inactive { opacity: 0.3; filter: grayscale(0.5); }
 
-        /* 화면용 캘린더 설정 */
+        /* 캘린더 가로 너비 고정 로직 */
         .calendar-container { 
             width: 100%; 
             border-collapse: collapse; 
-            table-layout: fixed; 
+            table-layout: fixed; /* 가로 너비 엄격하게 고정 */
             border: 1px solid var(--border-color); 
         }
         .calendar-container th, .calendar-container td { 
             border: 1px solid var(--border-color); 
             vertical-align: top;
-            width: 14.285%; 
+            width: 14.28%; /* 100% / 7일 = 정확히 균등 분할 */
         }
         .calendar-container th { padding: 10px; background: var(--card-bg); font-weight: bold; }
         .calendar-container th:nth-child(1) { color: var(--sunday-color); }
@@ -91,46 +89,40 @@
             z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; min-width: 150px; border-radius: 4px;
         }
 
-        /* 🖨️ 인쇄 최적화 - 너비 고정 및 자동 줄바꿈 강제 */
+        /* 🖨️ 인쇄 최적화 - 요일 너비 불균형 해결 버전 */
         @media print {
-            @page { margin: 10mm; size: auto; }
+            @page { margin: 10mm; }
             .no-print { display: none !important; }
             #printTitle { display: block !important; }
             body { padding: 0; background: white !important; color: black !important; }
             
             .calendar-container { 
-                border: 2px solid #000 !important; 
-                width: 100% !important; 
-                table-layout: fixed !important; 
-                border-collapse: collapse !important;
+                border: 2px solid #000; 
+                width: 100%; 
+                table-layout: fixed !important; /* 인쇄 시에도 요일 너비를 강제로 1/7로 고정 */
             }
-
-            .calendar-container th, 
-            .calendar-container td { 
-                width: 14.285% !important; 
-                min-width: 14.285% !important;
-                max-width: 14.285% !important;
-                border: 1px solid #000 !important;
-                overflow: visible !important;
-                word-wrap: break-word !important;
+            .calendar-container th, .calendar-container td { 
+                border: 1px solid #000;
+                width: 14.28% !important; 
             }
             
             .day-cell { 
                 min-height: 120px !important;
                 height: auto !important;
-                display: block !important;
+                overflow: visible !important; 
+                padding: 4px;
             }
             
             .program-item { 
                 font-size: 9pt !important;
-                white-space: normal !important; 
-                word-break: break-all !important; 
+                white-space: normal !important; /* 내용은 줄바꿈 허용하여 다 보여줌 */
+                word-break: break-all;
                 border: 1px solid #ccc !important;
                 margin-bottom: 3px;
                 padding: 3px 5px !important;
-                display: block !important;
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact; 
+                display: block !important;
             }
             .more-count { display: none !important; } 
             .day-num { font-size: 11pt; border-bottom: 1px solid #eee; margin-bottom: 5px; width: 100%; }
@@ -288,4 +280,95 @@
         const placeF = document.getElementById('placeFilter').value;
         
         const selectedMonth = parseInt(month) + 1;
-        const selectedTeams = activeFilters.has('all') ? '전체팀' : Array.from
+        const selectedTeams = activeFilters.has('all') ? '전체팀' : Array.from(activeFilters).join(', ');
+        const selectedPlace = placeF === 'all' ? '전체장소' : placeF;
+        document.getElementById('printTitle').innerText = `[${selectedMonth}월, ${selectedTeams}, ${selectedPlace}] 프로그램 캘린더`;
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, parseInt(month) + 1, 0).getDate();
+        const tbody = document.getElementById('calendarBody');
+        tbody.innerHTML = '';
+
+        const filtered = allPrograms.filter(p => {
+            const teamMatch = activeFilters.has('all') || activeFilters.has(p.team);
+            const placeMatch = placeF === 'all' || p.place === placeF;
+            return teamMatch && placeMatch;
+        });
+
+        updateStats(filtered);
+
+        let date = 1;
+        for (let i = 0; i < 6; i++) {
+            let row = document.createElement('tr');
+            for (let j = 0; j < 7; j++) {
+                let cell = document.createElement('td');
+                if (i === 0 && j < firstDay || date > lastDate) {
+                    cell.innerHTML = '<div class="day-cell"></div>';
+                } else {
+                    const dailyProgs = filtered.filter(p => p.day === date);
+                    let progHtml = dailyProgs.map(p => `
+                        <div class="program-item" 
+                             style="background:${teamSettings[p.team]?.bg}; color:${teamSettings[p.team]?.text}"
+                             onmouseover="showTooltip(event, '${p.name}', '${p.time}', '${p.place}', '${p.team}')"
+                             onmouseout="hideTooltip()">
+                             <strong>${p.time}</strong> ${p.name}
+                        </div>
+                    `).join('');
+                    
+                    if(dailyProgs.length > 3) {
+                        progHtml += `<div class="more-count no-print">+${dailyProgs.length - 3}개 더</div>`;
+                    }
+
+                    const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
+                    cell.innerHTML = `
+                        <div class="day-cell">
+                            <span class="day-num ${dayClass}">${date}</span>
+                            ${progHtml}
+                        </div>
+                    `;
+                    date++;
+                }
+                row.appendChild(cell);
+            }
+            tbody.appendChild(row);
+            if (date > lastDate) break;
+        }
+        
+        document.querySelectorAll('.team-chip').forEach(btn => {
+            if(activeFilters.has(btn.innerText) || (btn.id === 'filter-all' && activeFilters.has('all'))) {
+                btn.classList.remove('inactive');
+            } else {
+                btn.classList.add('inactive');
+            }
+        });
+    }
+
+    function updateStats(data) {
+        document.getElementById('stat-total').innerText = data.length;
+        document.getElementById('stat-days').innerText = new Set(data.map(p => p.day)).size;
+        document.getElementById('stat-teams').innerText = new Set(data.map(p => p.team)).size;
+        document.getElementById('stat-places').innerText = new Set(data.map(p => p.place)).size;
+    }
+
+    function showTooltip(e, name, time, place, team) {
+        const tt = document.getElementById('tooltip');
+        tt.innerHTML = `<strong>${name}</strong><br>🕒 ${time}<br>📍 ${place}<br>👥 ${team}`;
+        tt.style.display = 'block';
+        tt.style.left = (e.pageX + 10) + 'px';
+        tt.style.top = (e.pageY + 10) + 'px';
+    }
+
+    function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+    function resetData() {
+        if(confirm("모든 데이터를 삭제하시겠습니까?")) {
+            allPrograms = [];
+            renderCalendar();
+            initFilters();
+        }
+    }
+
+    window.onload = renderCalendar;
+</script>
+</body>
+</html>

@@ -28,6 +28,9 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
 
+        /* 인쇄 전용 제목 (평소엔 숨김) */
+        #printTitle { display: none; text-align: center; margin-bottom: 20px; font-size: 24px; font-weight: bold; }
+
         /* UI Controls */
         .no-print { margin-bottom: 20px; }
         .header-section { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -40,7 +43,6 @@
         .btn-print { background: var(--primary-color); color: white; border: none; font-weight: bold; }
         .btn-reset { background: #666; color: white; border: none; }
 
-        /* Stats & Filters */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .stat-card { background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); }
         .stat-card small { display: block; font-size: 0.8rem; color: #888; }
@@ -48,17 +50,16 @@
 
         .filter-section { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center; }
         .team-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; border: none; cursor: pointer; transition: transform 0.1s; }
-        .team-chip:active { transform: scale(0.95); }
         .team-chip.inactive { opacity: 0.3; filter: grayscale(0.5); }
 
         /* Calendar */
         .calendar-container { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-color); }
-        .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; overflow: hidden; }
+        .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; }
         .calendar-container th { padding: 10px; background: var(--card-bg); font-weight: bold; }
         .calendar-container th:nth-child(1) { color: var(--sunday-color); }
         .calendar-container th:nth-child(7) { color: var(--saturday-color); }
 
-        .day-cell { height: 110px; position: relative; padding: 5px; }
+        .day-cell { height: 110px; position: relative; padding: 5px; overflow: hidden; }
         .day-num { font-weight: bold; margin-bottom: 5px; display: block; }
         .sun { color: var(--sunday-color); }
         .sat { color: var(--saturday-color); }
@@ -69,23 +70,38 @@
         }
         .more-count { font-size: 0.7rem; color: #888; padding-left: 4px; }
 
-        /* Tooltip */
         .tooltip { 
             position: absolute; display: none; background: white; border: 1px solid #333; padding: 10px; 
             z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; min-width: 150px; border-radius: 4px;
         }
 
-        /* Print Settings */
+        /* 🖨️ 인쇄 미디어 쿼리 수정 */
         @media print {
             .no-print { display: none !important; }
-            body { padding: 0; }
-            .calendar-container { border: 2px solid #000; }
-            .day-cell { height: 130px; border: 1px solid #000; }
-            .program-item { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            #printTitle { display: block !important; } /* 인쇄 시 제목 표시 */
+            body { padding: 0; background: white !important; color: black !important; }
+            .calendar-container { border: 2px solid #000; width: 100%; }
+            .day-cell { 
+                height: 130px !important; 
+                overflow: visible !important; /* 내용이 다 보이도록 설정 */
+                border: 1px solid #000;
+            }
+            .program-item { 
+                white-space: normal !important; /* 줄바꿈 허용 */
+                word-break: break-all;
+                border: 1px solid #eee;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact; 
+                margin-bottom: 4px;
+            }
+            .more-count { display: none !important; } /* "+N개" 숨김 (전체 출력을 위해) */
+            .day-num { font-size: 14px; }
         }
     </style>
 </head>
 <body>
+
+<h1 id="printTitle">프로그램 캘린더</h1>
 
 <div class="no-print">
     <h2>사회복지 프로그램 캘린더 관리</h2>
@@ -174,7 +190,7 @@
             const sheet = workbook.Sheets["프로그램입력"];
             if(!sheet) { alert("'프로그램입력' 시트를 찾을 수 없습니다."); return; }
             
-            const json = XLSX.utils.sheet_to_json(sheet, { range: 2 }); // 3행(index 2)부터 시작
+            const json = XLSX.utils.sheet_to_json(sheet, { range: 2 });
             allPrograms = json.map(row => ({
                 day: parseInt(row['날짜(일)']),
                 name: row['프로그램명'] || '',
@@ -192,8 +208,6 @@
     function initFilters() {
         const teams = [...new Set(allPrograms.map(p => p.team))];
         const places = [...new Set(allPrograms.map(p => p.place))];
-        
-        // 팀 필터 생성
         const filterContainer = document.getElementById('teamFilters');
         filterContainer.innerHTML = `<button class="team-chip" onclick="toggleFilter('all')" id="filter-all">전체</button>`;
         
@@ -211,7 +225,6 @@
             filterContainer.appendChild(btn);
         });
 
-        // 장소 필터 생성
         const placeSelect = document.getElementById('placeFilter');
         placeSelect.innerHTML = '<option value="all">전체 장소</option>';
         places.forEach(p => {
@@ -222,9 +235,8 @@
     }
 
     function toggleFilter(team) {
-        if(team === 'all') {
-            activeFilters = new Set(['all']);
-        } else {
+        if(team === 'all') activeFilters = new Set(['all']);
+        else {
             activeFilters.delete('all');
             if(activeFilters.has(team)) activeFilters.delete(team);
             else activeFilters.add(team);
@@ -238,20 +250,23 @@
         const month = document.getElementById('monthInput').value;
         const placeF = document.getElementById('placeFilter').value;
         
+        // 1. 인쇄 제목 업데이트
+        const selectedMonth = parseInt(month) + 1;
+        const selectedTeams = activeFilters.has('all') ? '전체팀' : Array.from(activeFilters).join(', ');
+        const selectedPlace = placeF === 'all' ? '전체장소' : placeF;
+        document.getElementById('printTitle').innerText = `[${selectedMonth}월, ${selectedTeams}, ${selectedPlace}] 프로그램 캘린더`;
+
         const firstDay = new Date(year, month, 1).getDay();
         const lastDate = new Date(year, parseInt(month) + 1, 0).getDate();
-        
         const tbody = document.getElementById('calendarBody');
         tbody.innerHTML = '';
 
-        // 필터링 적용
         const filtered = allPrograms.filter(p => {
             const teamMatch = activeFilters.has('all') || activeFilters.has(p.team);
             const placeMatch = placeF === 'all' || p.place === placeF;
             return teamMatch && placeMatch;
         });
 
-        // 통계 업데이트
         updateStats(filtered);
 
         let date = 1;
@@ -263,17 +278,19 @@
                     cell.innerHTML = '<div class="day-cell"></div>';
                 } else {
                     const dailyProgs = filtered.filter(p => p.day === date);
-                    let progHtml = dailyProgs.slice(0, 3).map(p => `
+                    // 인쇄 시에는 모든 프로그램이 보여야 하므로 slice를 하지 않음 (단, 화면에서는 CSS overflow:hidden으로 제어)
+                    let progHtml = dailyProgs.map(p => `
                         <div class="program-item" 
                              style="background:${teamSettings[p.team]?.bg}; color:${teamSettings[p.team]?.text}"
                              onmouseover="showTooltip(event, '${p.name}', '${p.time}', '${p.place}', '${p.team}')"
                              onmouseout="hideTooltip()">
-                             ${p.time} · ${p.name}
+                             ${p.time} ${p.name}
                         </div>
                     `).join('');
                     
                     if(dailyProgs.length > 3) {
-                        progHtml += `<div class="more-count">+${dailyProgs.length - 3}개 더</div>`;
+                        // 화면용 "+N개 더" (인쇄 시 CSS에서 자동 숨김)
+                        progHtml += `<div class="more-count no-print">+${dailyProgs.length - 3}개 더</div>`;
                     }
 
                     const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
@@ -291,7 +308,6 @@
             if (date > lastDate) break;
         }
         
-        // 필터 버튼 활성화 표시
         document.querySelectorAll('.team-chip').forEach(btn => {
             if(activeFilters.has(btn.innerText) || (btn.id === 'filter-all' && activeFilters.has('all'))) {
                 btn.classList.remove('inactive');

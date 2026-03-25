@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>사회복지 프로그램 캘린더 (필터 완벽 복구)</title>
+    <title>사회복지 프로그램 캘린더</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -18,22 +18,10 @@
             --inactive-text: #aaaaaa;
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #1a1a1a;
-                --text-color: #f0f0f0;
-                --border-color: #444444;
-                --card-bg: #2d2d2d;
-                --inactive-bg: #333333;
-                --inactive-text: #666666;
-            }
-        }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
 
-        #printTitle { display: none; text-align: center; margin-bottom: 20px; font-size: 25pt; font-weight: bold; color: #000; }
-
+        #printTitle { display: none; text-align: center; margin-bottom: 20px; font-size: 25pt; font-weight: bold; }
         .no-print { margin-bottom: 20px; }
         .header-section { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
         .upload-zone { border: 2px dashed var(--border-color); padding: 20px; text-align: center; cursor: pointer; flex-grow: 1; transition: background 0.2s; }
@@ -41,24 +29,11 @@
         
         .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
         select, input, button { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color); cursor: pointer; }
-        
         .btn-print { background: var(--primary-color); color: white; border: none; font-weight: bold; }
-        .btn-reset { background: #666; color: white; border: none; }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: var(--card-bg); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border-color); }
-        .stat-card small { display: block; font-size: 0.8rem; color: #888; }
 
         .filter-section { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; align-items: center; }
-        
-        .team-chip { 
-            padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; border: 1px solid transparent; 
-            cursor: pointer; transition: all 0.2s ease; font-weight: 600;
-        }
-        .team-chip.inactive { 
-            background-color: var(--inactive-bg) !important; color: var(--inactive-text) !important;
-            border-color: var(--border-color); opacity: 0.6;
-        }
+        .team-chip { padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; border: 1px solid transparent; cursor: pointer; transition: all 0.2s ease; font-weight: 600; }
+        .team-chip.inactive { background-color: var(--inactive-bg) !important; color: var(--inactive-text) !important; opacity: 0.6; }
 
         .calendar-container { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-color); }
         .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; width: 14.285%; }
@@ -71,11 +46,7 @@
         .sun { color: var(--sunday-color); }
         .sat { color: var(--saturday-color); }
 
-        .program-item { 
-            font-size: 0.75rem; padding: 2px 4px; margin-bottom: 2px; border-radius: 2px; 
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
-        }
-
+        .program-item { font-size: 0.75rem; padding: 2px 4px; margin-bottom: 2px; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
         .tooltip { position: absolute; display: none; background: white; border: 1px solid #333; padding: 10px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; border-radius: 4px; }
 
         @media print {
@@ -91,12 +62,9 @@
 <h1 id="printTitle">프로그램 캘린더</h1>
 
 <div class="no-print">
-    <h2>사회복지 프로그램 관리</h2>
     <div class="header-section">
-        <div id="dropZone" class="upload-zone">
-            엑셀 파일을 드래그하거나 클릭하여 업로드하세요 (.xlsx)
-            <input type="file" id="fileInput" accept=".xlsx" style="display:none">
-        </div>
+        <div id="dropZone" class="upload-zone">엑셀 파일을 드래그하거나 클릭하여 업로드하세요 (.xlsx)</div>
+        <input type="file" id="fileInput" accept=".xlsx" style="display:none">
         <div class="controls">
             <input type="number" id="yearInput" value="2026" style="width: 80px;">
             <select id="monthInput">
@@ -108,15 +76,8 @@
                 <option value="10">11월</option><option value="11">12월</option>
             </select>
             <button onclick="renderCalendar()">달력 갱신</button>
-            <button class="btn-print" onclick="window.print()">PDF/인쇄</button>
-            <button class="btn-reset" onclick="resetData()">전체 삭제</button>
+            <button class="btn-print" onclick="window.print()">인쇄/PDF</button>
         </div>
-    </div>
-
-    <div class="stats-grid">
-        <div class="stat-card"><small>총 프로그램</small><strong id="stat-total">0</strong></div>
-        <div class="stat-card"><small>운영 일수</small><strong id="stat-days">0</strong></div>
-        <div class="stat-card"><small>참여 팀</small><strong id="stat-teams">0</strong></div>
     </div>
 
     <div class="filter-section">
@@ -125,9 +86,7 @@
     </div>
     <div class="filter-section">
         <span>장소 필터:</span>
-        <select id="placeFilter" onchange="renderCalendar()">
-            <option value="all">전체 장소</option>
-        </select>
+        <select id="placeFilter" onchange="renderCalendar()"><option value="all">전체 장소</option></select>
     </div>
 </div>
 
@@ -140,7 +99,8 @@
 
 <script>
     let rawExcelData = []; 
-    let teamSettings = {
+    // 요청하신 팀별 지정 색상 적용
+    const teamSettings = {
         '지역공동체팀': { bg: '#B5D4F4', text: '#042C53' },
         '가족교육문화팀': { bg: '#C0DD97', text: '#173404' },
         '가족사례팀': { bg: '#FAC775', text: '#412402' },
@@ -149,12 +109,9 @@
         '운영지원팀': { bg: '#CECBF6', text: '#26215C' },
         '기타': { bg: '#E5E8E8', text: '#424949' }
     };
-    
-    const extraPalette = [
-        { bg: '#F9E79F', text: '#7D6608' }, { bg: '#D7BDE2', text: '#4A235A' },
-        { bg: '#A9DFBF', text: '#145A32' }, { bg: '#AED6F1', text: '#1B4F72' },
-        { bg: '#F5B7B1', text: '#78281F' }
-    ];
+
+    // 요청하신 필터 나열 순서
+    const targetOrder = ['운영지원팀', '가족사례팀', '가족교육문화팀', '지역공동체팀', '아이돌봄팀', '공동육아나눔터', '기타'];
 
     let activeFilters = new Set(['all']);
 
@@ -177,8 +134,7 @@
         reader.onload = (e) => {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            const sheet = workbook.Sheets["프로그램입력"];
-            if(!sheet) { alert("'프로그램입력' 시트를 찾을 수 없습니다."); return; }
+            const sheet = workbook.Sheets[workbook.SheetNames[0]]; // 첫 번째 시트 자동 선택
             rawExcelData = XLSX.utils.sheet_to_json(sheet, { range: 2 });
             initFilters();
             renderCalendar();
@@ -186,42 +142,21 @@
         reader.readAsArrayBuffer(file);
     }
 
-    const dayMap = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
-
-    function getProcessedPrograms(year, month) {
-        let processed = [];
-        const lastDate = new Date(year, month + 1, 0).getDate();
-        rawExcelData.forEach(row => {
-            const teamName = row['팀명'] || '기타';
-            const dayNum = parseInt(row['날짜(일)']);
-            const weekDaysStr = row['요일'] ? String(row['요일']) : "";
-            
-            if (!isNaN(dayNum)) { 
-                processed.push({ ...row, team: teamName, day: dayNum }); 
-            } 
-            else if (weekDaysStr.trim() !== "") {
-                const targetDays = weekDaysStr.split(',').map(s => s.trim());
-                for (let d = 1; d <= lastDate; d++) {
-                    const currentDayOfWeek = new Date(year, month, d).getDay();
-                    targetDays.forEach(target => { 
-                        if (dayMap[target] === currentDayOfWeek) processed.push({ ...row, team: teamName, day: d }); 
-                    });
-                }
-            }
-        });
-        return processed;
-    }
-
     function initFilters() {
-        const teams = [...new Set(rawExcelData.map(p => p['팀명'] || '기타'))];
+        const foundTeams = [...new Set(rawExcelData.map(p => p['팀명'] || '기타'))];
         const places = [...new Set(rawExcelData.map(p => p['장소'] || '미지정'))];
         
-        // 1. 팀 필터 생성
+        // 지정된 순서대로 정렬
+        const sortedTeams = foundTeams.sort((a, b) => {
+            let indexA = targetOrder.indexOf(a);
+            let indexB = targetOrder.indexOf(b);
+            return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB);
+        });
+
         const filterContainer = document.getElementById('teamFilters');
         filterContainer.innerHTML = `<button class="team-chip" onclick="toggleFilter('all')" data-team="all">전체</button>`;
         
-        teams.forEach((team, idx) => {
-            if(!teamSettings[team]) teamSettings[team] = extraPalette[idx % extraPalette.length];
+        sortedTeams.forEach(team => {
             const btn = document.createElement('button');
             btn.className = 'team-chip';
             btn.innerText = team;
@@ -230,7 +165,6 @@
             filterContainer.appendChild(btn);
         });
 
-        // 2. 장소 필터 복구
         const placeSelect = document.getElementById('placeFilter');
         placeSelect.innerHTML = '<option value="all">전체 장소</option>';
         places.forEach(p => {
@@ -238,7 +172,6 @@
             opt.value = p; opt.innerText = p;
             placeSelect.appendChild(opt);
         });
-
         updateFilterUI();
     }
 
@@ -257,16 +190,10 @@
     function updateFilterUI() {
         document.querySelectorAll('.team-chip').forEach(btn => {
             const teamName = btn.getAttribute('data-team');
-            const isActive = activeFilters.has(teamName);
-            if (isActive) {
+            if (activeFilters.has(teamName)) {
                 btn.classList.remove('inactive');
-                if(teamName === 'all') {
-                    btn.style.backgroundColor = 'var(--primary-color)';
-                    btn.style.color = 'white';
-                } else {
-                    btn.style.backgroundColor = teamSettings[teamName].bg;
-                    btn.style.color = teamSettings[teamName].text;
-                }
+                btn.style.backgroundColor = teamName === 'all' ? 'var(--primary-color)' : (teamSettings[teamName]?.bg || '#eee');
+                btn.style.color = teamName === 'all' ? 'white' : (teamSettings[teamName]?.text || '#333');
             } else {
                 btn.classList.add('inactive');
                 btn.style.backgroundColor = ''; btn.style.color = '';
@@ -278,20 +205,29 @@
         const year = parseInt(document.getElementById('yearInput').value);
         const month = parseInt(document.getElementById('monthInput').value);
         const placeF = document.getElementById('placeFilter').value;
+        const lastDate = new Date(year, month + 1, 0).getDate();
         
-        const monthlyPrograms = getProcessedPrograms(year, month);
+        let processed = [];
+        const dayMap = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
 
-        // 팀 필터와 장소 필터 동시 적용
-        const filtered = monthlyPrograms.filter(p => {
-            const teamMatch = activeFilters.has('all') || activeFilters.has(p.team);
-            const placeMatch = placeF === 'all' || p['장소'] === placeF;
-            return teamMatch && placeMatch;
+        rawExcelData.forEach(row => {
+            const teamName = row['팀명'] || '기타';
+            const dayNum = parseInt(row['날짜(일)']);
+            const weekDaysStr = row['요일'] ? String(row['요일']) : "";
+            
+            if (!isNaN(dayNum)) { processed.push({ ...row, team: teamName, day: dayNum }); } 
+            else if (weekDaysStr.trim() !== "") {
+                const targetDays = weekDaysStr.split(',').map(s => s.trim());
+                for (let d = 1; d <= lastDate; d++) {
+                    if (targetDays.some(t => dayMap[t] === new Date(year, month, d).getDay())) 
+                        processed.push({ ...row, team: teamName, day: d });
+                }
+            }
         });
 
-        updateStats(filtered);
+        const filtered = processed.filter(p => (activeFilters.has('all') || activeFilters.has(p.team)) && (placeF === 'all' || p['장소'] === placeF));
         
         const firstDay = new Date(year, month, 1).getDay();
-        const lastDate = new Date(year, month + 1, 0).getDate();
         const tbody = document.getElementById('calendarBody');
         tbody.innerHTML = '';
 
@@ -300,18 +236,17 @@
             let row = document.createElement('tr');
             for (let j = 0; j < 7; j++) {
                 let cell = document.createElement('td');
-                if (i === 0 && j < firstDay || date > lastDate) {
+                if ((i === 0 && j < firstDay) || date > lastDate) {
                     cell.innerHTML = '<div class="day-cell"></div>';
                 } else {
-                    const dailyProgs = filtered.filter(p => p.day === date);
-                    let progHtml = dailyProgs.map(p => `
-                        <div class="program-item" style="background:${teamSettings[p.team]?.bg}; color:${teamSettings[p.team]?.text}"
+                    const daily = filtered.filter(p => p.day === date);
+                    const progHtml = daily.map(p => `
+                        <div class="program-item" style="background:${teamSettings[p.team]?.bg || '#eee'}; color:${teamSettings[p.team]?.text || '#333'}"
                              onmouseover="showTooltip(event, '${p['프로그램명']}', '${p['시간']}', '${p['장소']}', '${p.team}')" onmouseout="hideTooltip()">
                              <strong>${p['시간']}</strong> ${p['프로그램명']}
-                        </div>
-                    `).join('');
-                    const dayClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
-                    cell.innerHTML = `<div class="day-cell"><span class="day-num ${dayClass}">${date}</span>${progHtml}</div>`;
+                        </div>`).join('');
+                    const dClass = j === 0 ? 'sun' : (j === 6 ? 'sat' : '');
+                    cell.innerHTML = `<div class="day-cell"><span class="day-num ${dClass}">${date}</span>${progHtml}</div>`;
                     date++;
                 }
                 row.appendChild(cell);
@@ -321,19 +256,12 @@
         }
     }
 
-    function updateStats(data) {
-        document.getElementById('stat-total').innerText = data.length;
-        document.getElementById('stat-days').innerText = new Set(data.map(p => p.day)).size;
-        document.getElementById('stat-teams').innerText = new Set(data.map(p => p.team)).size;
-    }
-
     function showTooltip(e, name, time, place, team) {
         const tt = document.getElementById('tooltip');
         tt.innerHTML = `<strong>${name}</strong><br>🕒 ${time}<br>📍 ${place}<br>👥 ${team}`;
         tt.style.display = 'block'; tt.style.left = (e.pageX + 10) + 'px'; tt.style.top = (e.pageY + 10) + 'px';
     }
     function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
-    function resetData() { if(confirm("데이터를 모두 삭제하시겠습니까?")) { rawExcelData = []; renderCalendar(); document.getElementById('placeFilter').innerHTML = '<option value="all">전체 장소</option>'; } }
     window.onload = renderCalendar;
 </script>
 </body>

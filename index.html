@@ -28,7 +28,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; padding: 20px; }
 
-        /* 1. 인쇄 제목 스타일 (25pt, Bold) */
         #printTitle { 
             display: none; 
             text-align: center; 
@@ -38,7 +37,6 @@
             color: #000;
         }
 
-        /* UI Controls */
         .no-print { margin-bottom: 20px; }
         .header-section { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
         .upload-zone { border: 2px dashed var(--border-color); padding: 20px; text-align: center; cursor: pointer; flex-grow: 1; transition: background 0.2s; }
@@ -59,14 +57,22 @@
         .team-chip { padding: 4px 10px; border-radius: 15px; font-size: 0.85rem; border: none; cursor: pointer; transition: transform 0.1s; }
         .team-chip.inactive { opacity: 0.3; filter: grayscale(0.5); }
 
-        /* Calendar 기본 스타일 */
-        .calendar-container { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1px solid var(--border-color); }
-        .calendar-container th, .calendar-container td { border: 1px solid var(--border-color); vertical-align: top; }
+        /* 캘린더 가로 너비 고정 로직 */
+        .calendar-container { 
+            width: 100%; 
+            border-collapse: collapse; 
+            table-layout: fixed; /* 가로 너비 엄격하게 고정 */
+            border: 1px solid var(--border-color); 
+        }
+        .calendar-container th, .calendar-container td { 
+            border: 1px solid var(--border-color); 
+            vertical-align: top;
+            width: 14.28%; /* 100% / 7일 = 정확히 균등 분할 */
+        }
         .calendar-container th { padding: 10px; background: var(--card-bg); font-weight: bold; }
         .calendar-container th:nth-child(1) { color: var(--sunday-color); }
         .calendar-container th:nth-child(7) { color: var(--saturday-color); }
 
-        /* 화면용 셀 높이 고정 */
         .day-cell { min-height: 110px; position: relative; padding: 5px; overflow: hidden; }
         .day-num { font-weight: bold; margin-bottom: 5px; display: block; }
         .sun { color: var(--sunday-color); }
@@ -83,11 +89,9 @@
             z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: #333; min-width: 150px; border-radius: 4px;
         }
 
-        /* 🖨️ 인쇄 최적화 (A4, A3 대응) */
+        /* 🖨️ 인쇄 최적화 - 요일 너비 불균형 해결 버전 */
         @media print {
-            @page { 
-                margin: 10mm; /* 용지 여백 최적화 */
-            }
+            @page { margin: 10mm; }
             .no-print { display: none !important; }
             #printTitle { display: block !important; }
             body { padding: 0; background: white !important; color: black !important; }
@@ -95,28 +99,29 @@
             .calendar-container { 
                 border: 2px solid #000; 
                 width: 100%; 
-                table-layout: auto; /* 내용에 따라 열 너비 유동적 조절 */
+                table-layout: fixed !important; /* 인쇄 시에도 요일 너비를 강제로 1/7로 고정 */
             }
-            .calendar-container th { border: 1px solid #000; background: #f0f0f0 !important; color: #000 !important; font-size: 10pt; }
+            .calendar-container th, .calendar-container td { 
+                border: 1px solid #000;
+                width: 14.28% !important; 
+            }
             
             .day-cell { 
-                min-height: 120px !important; /* 최소 높이 보장 */
-                height: auto !important;     /* 내용이 많으면 자동으로 늘어남 */
+                min-height: 120px !important;
+                height: auto !important;
                 overflow: visible !important; 
-                border: none;
                 padding: 4px;
             }
             
             .program-item { 
-                font-size: 9pt !important;    /* 인쇄 시 가독성 있는 폰트 크기 */
-                white-space: normal !important; /* 줄바꿈 필수 */
-                word-break: keep-all;         /* 단어 단위 줄바꿈으로 깔끔하게 */
+                font-size: 9pt !important;
+                white-space: normal !important; /* 내용은 줄바꿈 허용하여 다 보여줌 */
+                word-break: break-all;
                 border: 1px solid #ccc !important;
                 margin-bottom: 3px;
                 padding: 3px 5px !important;
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact; 
-                line-height: 1.2;
                 display: block !important;
             }
             .more-count { display: none !important; } 
